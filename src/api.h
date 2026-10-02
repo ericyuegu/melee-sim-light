@@ -191,6 +191,7 @@ typedef struct MslObservationPlayer {
   uint8_t hurtbox_state;
   uint8_t invulnerable;
   uint8_t _pad0;
+  float hitlag_left;
 } MslObservationPlayer;
 
 typedef struct MslObservationRandall {
@@ -243,6 +244,8 @@ typedef struct MslTerminal {
 } MslTerminal;
 
 MSL_API const char* msl_result_string(MslResult result);
+// Increment when a public C struct layout or field meaning changes.
+MSL_API uint32_t msl_api_abi_version(void);
 MSL_API MslMatchConfig msl_match_config_default(void);
 
 // Immutable game data is loaded once per process, on the first

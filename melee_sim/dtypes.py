@@ -10,7 +10,7 @@ _SIZES = {
     "controller_input": 112,
     "input": 32,
     "match_config": 52,
-    "gamestate": 1208,
+    "gamestate": 1240,
     "terminal": 16,
 }
 
@@ -184,6 +184,7 @@ def gamestate_player_dtype() -> np.dtype:
             ("hurtbox_state", "u1"),
             ("invulnerable", "u1"),
             ("_pad0", "u1"),
+            ("hitlag_left", "<f4"),
         ],
         align=False,
     )

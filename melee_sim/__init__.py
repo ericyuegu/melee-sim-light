@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ._native import abi_version, native_library_path
 from .buffers import Buffers
 from .controller import (
     BUTTON_A,
@@ -33,6 +34,8 @@ from .dtypes import (
 from .env_batch import EnvBatch, game_data_loaded, preload_game_data
 
 __all__ = [
+    "abi_version",
+    "native_library_path",
     "EnvBatch",
     "game_data_loaded",
     "preload_game_data",

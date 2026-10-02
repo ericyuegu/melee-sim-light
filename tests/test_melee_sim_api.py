@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-
-import numpy as np
-import pytest
+from types import SimpleNamespace
 
 import melee_sim as msl
-from melee_sim import dtypes
-
+import numpy as np
+import pytest
+from melee_sim import _native, dtypes
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -81,10 +80,14 @@ def test_peach_pull_throw_reserves_runtime_items(monkeypatch) -> None:
 
 
 def test_python_wire_layout_matches_public_c_api() -> None:
+    assert msl.abi_version() == 2
+    assert msl.native_library_path().is_file()
     assert dtypes.controller_input_dtype().itemsize == 112
     assert dtypes.input_dtype().itemsize == 32
     assert dtypes.match_config_dtype().itemsize == 52
-    assert dtypes.gamestate_dtype().itemsize == 1208
+    assert dtypes.gamestate_dtype().itemsize == 1240
+    assert dtypes.gamestate_player_dtype().itemsize == 60
+    assert dtypes.gamestate_player_dtype().fields["hitlag_left"][1] == 56
     assert dtypes.gamestate_stage_dtype().itemsize == 24
     assert dtypes.gamestate_stage_dtype().fields["whispy"][1] == 20
     assert dtypes.terminal_dtype().itemsize == 16
@@ -93,6 +96,25 @@ def test_python_wire_layout_matches_public_c_api() -> None:
     players = buffers.controller_action_view["players"]
     assert np.all(players["main_stick_x"] == 0.5)
     assert np.all(players["main_stick_y"] == 0.5)
+
+
+@pytest.mark.parametrize("version", [None, 1])
+def test_incompatible_native_abi_is_rejected_before_binding(monkeypatch, version) -> None:
+    class VersionFunction:
+        def __call__(self) -> int:
+            return version
+
+    fake = SimpleNamespace()
+    if version is not None:
+        fake.msl_api_abi_version = VersionFunction()
+    monkeypatch.setattr(_native.ctypes, "CDLL", lambda path: fake)
+    monkeypatch.setattr(_native, "_library_path", lambda: Path("/old/libmelee_core.so"))
+    _native.library.cache_clear()
+    try:
+        with pytest.raises(_native.NativeError, match="ABI"):
+            _native.library()
+    finally:
+        _native.library.cache_clear()
 
 
 def test_whispy_observes_live_wind_and_clears_on_reset(monkeypatch) -> None:

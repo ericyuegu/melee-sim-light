@@ -12,6 +12,9 @@ class NativeError(RuntimeError):
     pass
 
 
+EXPECTED_ABI_VERSION = 2
+
+
 _RESULTS = {
     1: "invalid argument",
     2: "out of memory",
@@ -43,6 +46,18 @@ def library() -> ctypes.CDLL:
     pointer = ctypes.c_void_p
     size = ctypes.c_size_t
     u32 = ctypes.c_uint32
+
+    try:
+        abi_version = lib.msl_api_abi_version
+    except AttributeError as error:
+        raise NativeError("native simulator lacks the required ABI v2 identity") from error
+    abi_version.argtypes = []
+    abi_version.restype = u32
+    actual = abi_version()
+    if actual != EXPECTED_ABI_VERSION:
+        raise NativeError(
+            f"native simulator ABI {actual} is incompatible; expected {EXPECTED_ABI_VERSION}"
+        )
 
     lib.msl_game_data_acquire.argtypes = [ctypes.c_char_p]
     lib.msl_game_data_acquire.restype = ctypes.c_int
@@ -80,6 +95,16 @@ def library() -> ctypes.CDLL:
     lib.msl_python_controller_inputs.argtypes = [pointer, size, pointer, size, u32]
     lib.msl_python_controller_inputs.restype = ctypes.c_int
     return lib
+
+
+def abi_version() -> int:
+    """Return the checked public C observation ABI version."""
+    return int(library().msl_api_abi_version())
+
+
+def native_library_path() -> Path:
+    """Return the path of the loaded, ABI-checked native library."""
+    return Path(library()._name).resolve()
 
 
 def pointer(array: np.ndarray | None) -> ctypes.c_void_p:

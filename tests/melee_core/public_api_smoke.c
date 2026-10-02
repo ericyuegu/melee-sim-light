@@ -33,7 +33,8 @@ int main(int argc, char** argv) {
   configs[1].players[1].character = MSL_CHARACTER_GAMEWATCH;
   configs[1].max_frame = 120;
 
-  if (strcmp(msl_result_string(MSL_INVALID_ARGUMENT), "invalid argument") != 0 ||
+  if (msl_api_abi_version() != 2 ||
+      strcmp(msl_result_string(MSL_INVALID_ARGUMENT), "invalid argument") != 0 ||
       msl_batch_create(argv[1], BATCH_SIZE, &batch) != MSL_OK ||
       msl_batch_size(batch) != BATCH_SIZE ||
       msl_batch_step(batch, inputs, observations, terminals) != MSL_INVALID_STATE ||

@@ -358,11 +358,11 @@ _Static_assert(sizeof(MslCoreStreamJobHeader) == 119,
                "stream job header wire size");
 _Static_assert(sizeof(MslCoreItem) == 48, "MslCoreItem wire size");
 _Static_assert(sizeof(MslCoreCompare) == 1302, "MslCoreCompare wire size");
-_Static_assert(sizeof(MslCoreObservationPlayer) == 56,
+_Static_assert(sizeof(MslCoreObservationPlayer) == 60,
                "MslCoreObservationPlayer wire size");
 _Static_assert(sizeof(MslCoreObservationStage) == 24,
                "MslCoreObservationStage wire size");
-_Static_assert(sizeof(MslCoreObservation) == 1208,
+_Static_assert(sizeof(MslCoreObservation) == 1240,
                "MslCoreObservation wire size");
 _Static_assert(sizeof(MslCoreTerminal) == 16,
                "MslCoreTerminal wire size");

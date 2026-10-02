@@ -39,11 +39,16 @@ _Static_assert(sizeof(MslMatchConfig) == 52, "MslMatchConfig layout");
 _Static_assert(sizeof(MslInputPlayer) == 8, "MslInputPlayer layout");
 _Static_assert(sizeof(MslInput) == 32, "MslInput layout");
 _Static_assert(sizeof(MslItem) == 48, "MslItem layout");
-_Static_assert(sizeof(MslObservation) == 1208, "MslObservation layout");
+_Static_assert(sizeof(MslObservationPlayer) == 60, "MslObservationPlayer layout");
+_Static_assert(offsetof(MslObservationPlayer, hitlag_left) == 56,
+               "MslObservationPlayer hitlag_left layout");
+_Static_assert(sizeof(MslObservation) == 1240, "MslObservation layout");
 _Static_assert(sizeof(MslTerminal) == 16, "MslTerminal layout");
 _Static_assert(sizeof(MslSaveHeader) == 20, "MslSaveHeader layout");
 
 static MslResult public_result(MslCoreResult result) { return (MslResult)result; }
+
+uint32_t msl_api_abi_version(void) { return 2; }
 
 static int supported_stage(uint32_t stage) {
   return stage == MSL_STAGE_FOUNTAIN_OF_DREAMS || stage == MSL_STAGE_POKEMON_STADIUM ||

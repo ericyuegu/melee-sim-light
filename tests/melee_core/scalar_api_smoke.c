@@ -53,6 +53,52 @@ static int check_absent_observation(MslCoreMatch* match)
     return result;
 }
 
+static int check_hitlag_left_observation(MslCoreMatch* match)
+{
+    Fighter* leader = GET_FIGHTER(match->fighters[0]);
+    Fighter* follower;
+    MslCoreObservation direct;
+    MslCoreObservation compared;
+    float leader_hitlag = leader->dmg.x195c_hitlag_frames;
+    float follower_hitlag;
+    int follower_asleep;
+    int result = 0;
+
+    if (match->follower_fighters[0] == NULL) {
+        fprintf(stderr, "Ice Climbers follower is missing\n");
+        return 1;
+    }
+    follower = GET_FIGHTER(match->follower_fighters[0]);
+    follower_hitlag = follower->dmg.x195c_hitlag_frames;
+    follower_asleep = follower->x221F_b3;
+    leader->dmg.x195c_hitlag_frames = 3.75F;
+    follower->dmg.x195c_hitlag_frames = 2.5F;
+    follower->x221F_b3 = 0;
+
+    msl_core_match_write_observation(match, 0, &direct);
+    msl_core_match_write_observation_from_compare(match, 0, &compared);
+    if (direct.slots[0].hitlag_left != 3.75F ||
+        direct.slots[0].hitlag != 3 ||
+        compared.slots[0].hitlag_left != 3.75F ||
+        !direct.followers[0].present ||
+        direct.followers[0].hitlag_left != 2.5F ||
+        direct.followers[0].hitlag != 2)
+    {
+        fprintf(stderr, "fractional leader/follower hitlag observation differs\n");
+        result = 1;
+    }
+    follower->x221F_b3 = 1;
+    msl_core_match_write_observation(match, 0, &direct);
+    if (direct.followers[0].present || direct.followers[0].hitlag_left != 0.0F) {
+        fprintf(stderr, "asleep follower leaked hitlag into observation\n");
+        result = 1;
+    }
+    leader->dmg.x195c_hitlag_frames = leader_hitlag;
+    follower->dmg.x195c_hitlag_frames = follower_hitlag;
+    follower->x221F_b3 = follower_asleep;
+    return result;
+}
+
 static int check_randall_surface(MslCoreMatch* match, const MslCoreGameData* data,
                                  MslCoreMatchConfig config)
 {
@@ -216,6 +262,12 @@ int main(int argc, char** argv)
         return 1;
     }
     if (check_randall_surface(&match, &game_data, config) != 0) return 1;
+    config.stage_id = MSL_STAGE_FINAL_DESTINATION;
+    config.num_players = 2;
+    config.is_teams = 0;
+    config.players[0].char_id = MSL_CHARACTER_ICE_CLIMBERS;
+    if (msl_core_match_reset(&match, &game_data, &config, &previous_input) != 0 ||
+        check_hitlag_left_observation(&match) != 0) return 1;
     msl_core_match_destroy(&match);
     return 0;
 }
