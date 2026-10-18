@@ -26,7 +26,7 @@ typedef struct MslCoreSlippiState {
 
 void msl_slippi_state_init(MslCoreSlippiState* state, u8 stage_event_streams);
 void msl_slippi_state_bind(MslCoreSlippiState* state);
-void msl_slippi_stage_events_begin(const struct MslCoreStageEvents* events);
+void msl_slippi_stage_events_begin(const MslCoreStageEvents* events);
 bool msl_slippi_fod_platform_height(u8 platform, f32 source_height,
                                     f32* height, bool* changed);
 bool msl_slippi_dreamland_whispy_direction(u8* direction);

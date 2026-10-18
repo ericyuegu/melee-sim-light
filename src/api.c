@@ -49,6 +49,7 @@ _Static_assert(sizeof(MslSaveHeader) == 20, "MslSaveHeader layout");
 static MslResult public_result(MslCoreResult result) { return (MslResult)result; }
 
 uint32_t msl_api_abi_version(void) { return 2; }
+uint32_t msl_replay_abi_version(void) { return 1; }
 
 static int supported_stage(uint32_t stage) {
   return stage == MSL_STAGE_FOUNTAIN_OF_DREAMS || stage == MSL_STAGE_POKEMON_STADIUM ||
@@ -429,6 +430,35 @@ MslResult msl_batch_step_masked(MslBatch* batch, const MslInput inputs[],
 MslResult msl_batch_step(MslBatch* batch, const MslInput inputs[], MslObservation observations[],
                          MslTerminal terminals[]) {
   return msl_batch_step_masked(batch, inputs, NULL, observations, terminals);
+}
+
+MslResult msl_batch_reset_replay(MslBatch* batch, const MslReplayConfig configs[],
+                                 const MslReplayInput previous[], const uint8_t mask[]) {
+  MslCoreResult result;
+  uint32_t env;
+  if (batch == NULL || configs == NULL || previous == NULL)
+    return MSL_INVALID_ARGUMENT;
+  result = msl_core_batch_reset_replay(batch->runtime, configs, previous, mask);
+  if (result != MSL_CORE_OK) return public_result(result);
+  for (env = 0; env < batch->size; ++env) {
+    if (mask == NULL || mask[env]) {
+      batch->configs[env] = configs[env];
+      batch->viewpoint_players[env] = 0;
+      batch->max_frames[env] = -1;
+    }
+  }
+  return MSL_OK;
+}
+
+MslResult msl_batch_step_replay(MslBatch* batch, const MslReplayFrame frames[],
+                                const uint8_t mask[], MslObservation observations[],
+                                MslTerminal terminals[]) {
+  MslCoreResult result;
+  if (batch == NULL || frames == NULL || observations == NULL || terminals == NULL)
+    return MSL_INVALID_ARGUMENT;
+  result = msl_core_batch_step_replay(batch->runtime, frames, mask);
+  if (result != MSL_CORE_OK) return public_result(result);
+  return msl_batch_observe(batch, observations, terminals);
 }
 
 MslResult msl_batch_copy(MslBatch* destination, const MslBatch* source,

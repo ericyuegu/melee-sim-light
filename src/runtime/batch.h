@@ -34,6 +34,11 @@ MslCoreResult msl_core_batch_reset_matches(
 MslCoreResult msl_core_batch_step_matches(
     MslCoreBatch* batch, const MslCoreInput* inputs, size_t input_stride,
     const uint8_t* match_mask, size_t mask_stride);
+MslCoreResult msl_core_batch_reset_replay(
+    MslCoreBatch* batch, const MslReplayConfig* configs,
+    const MslReplayInput* previous, const uint8_t* mask);
+MslCoreResult msl_core_batch_step_replay(
+    MslCoreBatch* batch, const MslReplayFrame* frames, const uint8_t* mask);
 MslCoreResult msl_core_batch_write_state(
     const MslCoreBatch* batch, MslCoreCompare* output, size_t output_stride,
     const uint8_t* match_mask, size_t mask_stride);

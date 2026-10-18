@@ -233,11 +233,12 @@ static MslCoreResult validate_mask(const MslCoreBatch* batch,
     return MSL_CORE_OK;
 }
 
-MslCoreResult msl_core_batch_reset_matches(
+static MslCoreResult reset_matches(
     MslCoreBatch* batch, const MslCoreMatchConfig* configs,
-    size_t config_stride, const uint8_t* match_mask, size_t mask_stride)
+    size_t config_stride, const uint8_t* match_mask, size_t mask_stride,
+    const MslReplayInput* previous_inputs)
 {
-    MslCoreInput previous = { 0 };
+    MslCoreInput neutral = { 0 };
     uint32_t i;
     if (validate_mask(batch, match_mask, mask_stride) != MSL_CORE_OK ||
         configs == NULL || config_stride < sizeof(*configs))
@@ -264,7 +265,9 @@ MslCoreResult msl_core_batch_reset_matches(
             while (batch->reset_index[slot] != 0) {
                 uint32_t candidate = batch->reset_index[slot] - 1;
                 if (memcmp(config, &batch->matches[candidate].config,
-                           sizeof(*config)) == 0)
+                           sizeof(*config)) == 0 &&
+                    (previous_inputs == NULL || memcmp(&previous_inputs[i],
+                        &previous_inputs[candidate], sizeof(*previous_inputs)) == 0))
                 {
                     source = candidate;
                     break;
@@ -273,7 +276,7 @@ MslCoreResult msl_core_batch_reset_matches(
             }
             if (source == UINT32_MAX) {
                 if (msl_core_match_reset(&batch->matches[i], batch->game_data,
-                                         config, &previous) != 0)
+                                         config, previous_inputs != NULL ? &previous_inputs[i] : &neutral) != 0)
                 {
                     return MSL_CORE_INVALID_STATE;
                 }
@@ -288,6 +291,76 @@ MslCoreResult msl_core_batch_reset_matches(
             }
             batch->initialized[i] = 1;
         }
+    }
+    return MSL_CORE_OK;
+}
+
+MslCoreResult msl_core_batch_reset_matches(
+    MslCoreBatch* batch, const MslCoreMatchConfig* configs,
+    size_t config_stride, const uint8_t* match_mask, size_t mask_stride)
+{
+    return reset_matches(batch, configs, config_stride, match_mask, mask_stride, NULL);
+}
+
+MslCoreResult msl_core_batch_reset_replay(
+    MslCoreBatch* batch, const MslReplayConfig* configs,
+    const MslReplayInput* previous, const uint8_t* mask)
+{
+    if (previous == NULL) return MSL_CORE_INVALID_ARGUMENT;
+    if (batch == NULL || configs == NULL) return MSL_CORE_INVALID_ARGUMENT;
+    for (uint32_t i = 0; i < batch->match_count; ++i) {
+        const MslReplayConfig* c = &configs[i];
+        if (!selected(mask, 1, i)) continue;
+        if (c->match_damage_ratio <= 0 || c->stock_count == 0 || c->is_teams > 1 ||
+            c->friendly_fire > 1 || c->camera_mode > 1 ||
+            c->online_fnmsubs_zero > 1 || c->brawl_offscreen_damage > 1 ||
+            c->freeze_dead_up_fall_physics > 1 || c->whispy_dead_fighter_fix > 1 ||
+            c->ucf_cardinals_1_0_enabled > 1 || c->ucf_shield_sdi_enabled > 1 ||
+            c->ucf_sdi_enabled > 1 || c->ucf_shield_drop_extended_enabled > 1 ||
+            c->ucf_shield_drop_084_enabled > 1 || c->stage_event_streams > 3)
+            return MSL_CORE_INVALID_ARGUMENT;
+        for (uint32_t p = 0; p < c->num_players && p < MSL_MAX_PLAYERS; ++p) {
+            if (c->players[p].handicap < 1 || c->players[p].cpu_level > 9 ||
+                previous[i].p[p].nml_valid > 3)
+                return MSL_CORE_INVALID_ARGUMENT;
+        }
+    }
+    return reset_matches(batch, configs, sizeof(*configs), mask, 1, previous);
+}
+
+MslCoreResult msl_core_batch_step_replay(
+    MslCoreBatch* batch, const MslReplayFrame* frames, const uint8_t* mask)
+{
+    uint32_t i;
+    if (validate_mask(batch, mask, 1) != MSL_CORE_OK || frames == NULL)
+        return MSL_CORE_INVALID_ARGUMENT;
+    for (i = 0; i < batch->match_count; ++i) {
+        if (!selected(mask, 1, i)) continue;
+        const MslReplayStageEvents* e = &frames[i].stage_events;
+        if (e->fod_platform_mask > 3 || e->dreamland_whispy_valid > 1 ||
+            e->fighter_pre_random_seed_valid > 1 ||
+            (e->dreamland_whispy_valid && e->dreamland_whispy_direction > 2))
+            return MSL_CORE_INVALID_ARGUMENT;
+        for (uint32_t p = 0; p < MSL_MAX_PLAYERS; ++p) {
+            if (frames[i].input.p[p].nml_valid > 3 || e->cpu_inputs[p].valid > 1)
+                return MSL_CORE_INVALID_ARGUMENT;
+            if (p < 2 && (e->fod_platform_mask & (1 << p)) && !isfinite(e->fod_platform_height[p]))
+                return MSL_CORE_INVALID_ARGUMENT;
+            const MslReplayCpuInput* cpu = &e->cpu_inputs[p];
+            if (cpu->valid && (!isfinite(cpu->main_x) || !isfinite(cpu->main_y) ||
+                !isfinite(cpu->c_x) || !isfinite(cpu->c_y) || !isfinite(cpu->trigger)))
+                return MSL_CORE_INVALID_ARGUMENT;
+        }
+    }
+    for (i = 0; i < batch->match_count; ++i) {
+        if (selected(mask, 1, i) && !batch->initialized[i])
+            return MSL_CORE_INVALID_STATE;
+    }
+    for (i = 0; i < batch->match_count; ++i) {
+        if (selected(mask, 1, i) &&
+            msl_core_match_step(&batch->matches[i], &frames[i].input,
+                frames[i].frame_pre_random_seed, &frames[i].stage_events) != 0)
+            return MSL_CORE_INVALID_STATE;
     }
     return MSL_CORE_OK;
 }

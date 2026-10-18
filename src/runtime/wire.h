@@ -16,133 +16,14 @@ enum {
 
 #pragma pack(push, 1)
 
-typedef struct MslCoreInputPlayer {
-    uint16_t buttons;
-    // Physical signed bytes retained for UCF's raw-input consumers.
-    int8_t main_x;
-    int8_t main_y;
-    int8_t c_x;
-    int8_t c_y;
-    uint8_t l;
-    uint8_t r;
-    // Optional post-clamp HSD axes. Slippi playback restores these floats to
-    // Fighter input state independently of the physical bytes above.
-    int8_t nml_main_x;
-    int8_t nml_main_y;
-    int8_t nml_c_x;
-    int8_t nml_c_y;
-    uint8_t nml_valid;
-} MslCoreInputPlayer;
-
-enum {
-    MSL_CORE_INPUT_NML_MAIN_VALID = 1 << 0,
-    MSL_CORE_INPUT_NML_C_VALID = 1 << 1,
-};
-
-typedef struct MslCoreInput {
-    MslCoreInputPlayer p[MSL_CORE_MAX_PLAYERS];
-} MslCoreInput;
-
-// Slippi Playback/Core/RestoreGameFrame.asm publishes processed inputs at
-// 0x8006B0DC, independently of physical controller bytes. Validation also
-// carries the RNG observation from Recording/SendGamePreFrame.asm.
-typedef struct MslReplayCpuInput {
-    float main_x, main_y, c_x, c_y, trigger;
-    uint32_t buttons;
-    uint32_t random_seed;
-    uint8_t valid;
-} MslReplayCpuInput;
-
-typedef struct MslCoreStageEvents {
-    float fod_platform_height[2];
-    // Slippi records the global RNG both at the frame-start scheduler boundary
-    // and again when the first fighter input callback begins. The latter
-    // closes over earlier stage/effect consumers without making them fighter
-    // logic.
-    uint32_t fighter_pre_random_seed;
-    uint8_t fod_platform_mask;
-    uint8_t dreamland_whispy_valid;
-    uint8_t dreamland_whispy_direction;
-    uint8_t fighter_pre_random_seed_valid;
-    MslReplayCpuInput cpu_inputs[MSL_CORE_MAX_PLAYERS];
-} MslCoreStageEvents;
-
-typedef struct MslCoreStreamFrame {
-    uint32_t frame_pre_random_seed;
-    MslCoreInput input;
-    MslCoreStageEvents stage_events;
-} MslCoreStreamFrame;
-
-enum { MSL_FACING_AUTO_FLAG = 0x10 };
-
-typedef struct MslCoreMatchPlayerConfig {
-    uint8_t char_id;
-    uint8_t team_id;
-    // Bit 0 is facing. Bits 1..3 optionally carry the one-based physical
-    // controller port; zero selects the source index and automatic facing.
-    // Bit 4 selects automatic facing with an explicit controller port.
-    uint8_t facing_and_port;
-    uint8_t costume_id;
-    uint8_t handicap;
-    uint8_t start_percent;
-    uint8_t cpu_level; // Zero selects a controller; 1..9 retain a CPU slot.
-} MslCoreMatchPlayerConfig;
-
-typedef struct MslCoreMatchConfig {
-    uint32_t stage_id;
-    int32_t frame_id;
-    uint32_t frame_pre_random_seed;
-    // Slippi's game-start event records the seed restored before match/stage
-    // construction. Online frame seeds subsequently add a per-frame high-word
-    // offset and must not initialize persistent stage state.
-    uint32_t initial_random_seed;
-    float match_damage_ratio;
-    uint8_t num_players;
-    uint8_t is_teams;
-    uint8_t friendly_fire;
-    uint8_t stock_count;
-    uint8_t camera_mode;
-    // Runtime capabilities are explicit because scene major alone does not
-    // distinguish Slippi's offline Dolphin patch set from Nintendont retail.
-    uint8_t online_fnmsubs_zero;
-    uint8_t brawl_offscreen_damage;
-    uint8_t freeze_dead_up_fall_physics;
-    // UCF 0.84 and its 1.0 cardinal-coordinate patch are independently
-    // selectable in real Slippi recordings. Older recordings may contain
-    // UCF dashback/shield-drop behavior without cardinal snapping.
-    // refs/slippi-ssbm-asm/Output/InjectionLists/list_netplay.json
-    uint8_t ucf_cardinals_1_0_enabled;
-    // UCF's shield-SDI injection was not present in every Slippi UCF profile.
-    // Keep it independent of dashback, shield drop, and cardinal snapping so
-    // older recordings do not receive a second, unrecorded SDI displacement.
-    // refs/slippi-ssbm-asm/External/UCF 0.84/UCF/UCF Shield SDI.asm
-    uint8_t ucf_shield_sdi_enabled;
-    // UCF's ordinary hitlag-SDI injection is a separate rollout/capability
-    // from shield SDI and from the original dashback/shield-drop mechanics.
-    // refs/slippi-ssbm-asm/External/UCF 0.84/UCF/UCF SDI.asm
-    uint8_t ucf_sdi_enabled;
-    // The counter-based (extended) shield drop is likewise its own rollout;
-    // recordings that predate it keep the classic shield-drop stick check
-    // only.
-    // refs/slippi-ssbm-asm/External/UCF 0.84/UCF/UCF Shield Drop Extended.asm
-    uint8_t ucf_shield_drop_extended_enabled;
-    // The classic shield drop itself shipped in two versions. UCF 0.84 gates
-    // the spot-dodge suppression on standing on a platform line; the earlier
-    // UCF 0.8 code (unchanged since 0.73) has no platform check and applies
-    // its float rim test everywhere, so a rim-coordinate shield press with the
-    // stick held down on the main floor shields instead of spot-dodging.
-    // Recordings whose embedded gecko list carries the 0.8 code clear this.
-    // refs/slippi-ssbm-asm/External/UCF 0.84/UCF/UCF Shield Drop.asm
-    // refs/slippi-ssbm-asm/External/UCF 0.8/Logic/UCF SD.asm
-    uint8_t ucf_shield_drop_084_enabled;
-    // Bit 0: Slippi 3.18+ FoD platform events; bit 1: Dream Land Whispy
-    // direction events. A present stream is authoritative even on frames with
-    // no event, where the last published value remains active.
-    uint8_t stage_event_streams;
-    // Online/Core/WhispyBlowDirFix excludes death animations from the vote.
-    uint8_t whispy_dead_fighter_fix;
-    MslCoreMatchPlayerConfig players[MSL_CORE_MAX_PLAYERS];
-} MslCoreMatchConfig;
+typedef MslReplayInputPlayer MslCoreInputPlayer;
+typedef MslReplayInput MslCoreInput;
+typedef MslReplayStageEvents MslCoreStageEvents;
+typedef MslReplayFrame MslCoreStreamFrame;
+typedef MslReplayPlayerConfig MslCoreMatchPlayerConfig;
+typedef MslReplayConfig MslCoreMatchConfig;
+enum { MSL_CORE_INPUT_NML_MAIN_VALID = MSL_REPLAY_INPUT_NML_MAIN_VALID,
+       MSL_CORE_INPUT_NML_C_VALID = MSL_REPLAY_INPUT_NML_C_VALID };
 
 // Native validation workers keep immutable GameData alive across jobs. The
 // frame count gives each job an explicit boundary without closing the stream;

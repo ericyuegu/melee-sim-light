@@ -363,15 +363,20 @@ static int parse_start(PyObject* start, ReplayView* replay) {
   value = PyDict_GetItemString(start, "is_teams");
   replay->is_teams = value != NULL && PyObject_IsTrue(value) > 0;
   value = PyDict_GetItemString(start, "bitfield");
-  if (value != NULL && PyList_Check(value) && PyList_GET_SIZE(value) >= 2) {
-    PyObject* rules = PyList_GET_ITEM(value, 1);
-    if (PyLong_Check(rules)) {
-      // Slippi game-start bitfield byte 1 bit 0 is the VS rules friendly-fire
-      // flag, matching gm_1601.c's rules.x1_7 publication.
-      // refs/melee/src/melee/gm/gm_1601.c::gm_8016A92C
-      replay->friendly_fire = (PyLong_AsUnsignedLong(rules) & 1U) != 0;
-    }
+  if (value == NULL || (!PyList_Check(value) && !PyTuple_Check(value)) || PySequence_Size(value) != 4) {
+    PyErr_SetString(PyExc_ValueError, "replay start bitfield must contain four bytes");
+    return -1;
   }
+  PyObject* rules = PySequence_GetItem(value, 1);
+  if (rules == NULL) return -1;
+  unsigned long rules_byte = PyLong_AsUnsignedLong(rules);
+  Py_DECREF(rules);
+  if (PyErr_Occurred()) return -1;
+  if (rules_byte > 255) {
+    PyErr_SetString(PyExc_ValueError, "replay rules bitfield is not a byte");
+    return -1;
+  }
+  replay->friendly_fire = (rules_byte & 1U) != 0;
   scene = PyDict_GetItemString(start, "scene");
   value = scene != NULL && PyDict_Check(scene) ? PyDict_GetItemString(scene, "major") : NULL;
   if (value == NULL || !PyLong_Check(value)) {
@@ -2752,6 +2757,121 @@ done:
   return result;
 }
 
+static PyObject* export_replay(PyObject* self, PyObject* args, PyObject* kwargs) {
+  static char* keywords[] = {
+      "frames",
+      "start",
+      "metadata",
+      "ucf_cardinals_1_0_enabled",
+      "ucf_shield_sdi_enabled",
+      "ucf_sdi_enabled",
+      "ucf_shield_drop_extended_enabled",
+      "ucf_shield_drop_084_enabled",
+      "fnmsubs_profile",
+      NULL,
+  };
+  PyObject* frames_obj;
+  PyObject* start_obj;
+  PyObject* metadata_obj;
+  PyObject* arrow_pair = NULL;
+  const char* fnmsubs_profile = NULL;
+  int ucf_cardinals_1_0_enabled = 1;
+  int ucf_shield_sdi_enabled = 1;
+  int ucf_sdi_enabled = 1;
+  int ucf_shield_drop_extended_enabled = 1;
+  int ucf_shield_drop_084_enabled = 1;
+  struct ArrowSchema* schema;
+  struct ArrowArray* array;
+  ArrowNode frames;
+  ReplayView replay;
+  FrameRows rows;
+  StreamState state = {0};
+  PyObject* tape = NULL;
+  int64_t i;
+  char error[512] = {0};
+  PyObject* result = NULL;
+  (void)self;
+
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOO|pppppz:export_replay", keywords,
+                                   &frames_obj, &start_obj, &metadata_obj,
+                                   &ucf_cardinals_1_0_enabled, &ucf_shield_sdi_enabled,
+                                   &ucf_sdi_enabled, &ucf_shield_drop_extended_enabled,
+                                   &ucf_shield_drop_084_enabled, &fnmsubs_profile)) {
+    return NULL;
+  }
+  memset(&replay, 0, sizeof(replay));
+  memset(&rows, 0, sizeof(rows));
+  if (parse_start(start_obj, &replay) != 0 || parse_metadata(metadata_obj, &replay) != 0) {
+    goto done;
+  }
+  if (msl_set_fnmsubs_profile(&replay, fnmsubs_profile) != 0) {
+    goto done;
+  }
+
+  arrow_pair = PyObject_CallMethod(frames_obj, "__arrow_c_array__", NULL);
+  if (arrow_pair == NULL) {
+    goto done;
+  }
+  if (!PyTuple_Check(arrow_pair) || PyTuple_GET_SIZE(arrow_pair) != 2) {
+    PyErr_SetString(PyExc_TypeError, "frames.__arrow_c_array__() returned an invalid pair");
+    goto done;
+  }
+  schema =
+      (struct ArrowSchema*)PyCapsule_GetPointer(PyTuple_GET_ITEM(arrow_pair, 0), "arrow_schema");
+  if (schema == NULL) {
+    goto done;
+  }
+  array = (struct ArrowArray*)PyCapsule_GetPointer(PyTuple_GET_ITEM(arrow_pair, 1), "arrow_array");
+  if (array == NULL) {
+    goto done;
+  }
+  frames.schema = schema;
+  frames.array = array;
+  if (load_replay(frames, &replay, error, sizeof(error)) != 0 ||
+      build_finalized_rows(&replay, &rows, error, sizeof(error)) != 0 ||
+      build_match_config(&replay, &rows, ucf_cardinals_1_0_enabled, ucf_shield_sdi_enabled,
+                         ucf_sdi_enabled, ucf_shield_drop_extended_enabled,
+                         ucf_shield_drop_084_enabled, &state.config,
+                         error, sizeof(error)) != 0) {
+    PyErr_SetString(PyExc_ValueError, error);
+    goto done;
+  }
+  if (rows.count > UINT32_MAX) {
+    PyErr_SetString(PyExc_OverflowError, "benchmark replay exceeds the case format");
+    goto done;
+  }
+
+  state.replay = &replay;
+  state.rows = &rows;
+  state.process_end_pos = rows.count - 1;
+  build_input(&replay, &rows, 0, &state.previous);
+  tape = PyByteArray_FromStringAndSize(NULL, 0);
+  if (tape == NULL) goto done;
+  while (state.next_input_pos < rows.count) {
+    Py_ssize_t offset = PyByteArray_Size(tape);
+    refill_write_buffer(&state);
+    if (PyByteArray_Resize(tape, offset + (Py_ssize_t)state.write_len) != 0)
+      goto done;
+    memcpy(PyByteArray_AsString(tape) + offset, state.write_buf, state.write_len);
+  }
+  result = Py_BuildValue("{s:I,s:n,s:n,s:n,s:O}",
+      "abi", 1U, "config_size", (Py_ssize_t)sizeof(MslReplayConfig),
+      "input_size", (Py_ssize_t)sizeof(MslReplayInput),
+      "frame_size", (Py_ssize_t)sizeof(MslReplayFrame), "tape", tape);
+
+done:
+  Py_XDECREF(tape);
+  for (i = 0; i < MSL_CORE_MAX_PLAYERS; ++i) {
+    free(rows.player_raw[i]);
+    free(rows.player_present[i]);
+    free(rows.follower_raw[i]);
+    free(rows.follower_present[i]);
+  }
+  free(rows.raw);
+  Py_XDECREF(arrow_pair);
+  return result;
+}
+
 static uint32_t read_be_u32(const uint8_t* value) {
   return ((uint32_t)value[0] << 24) | ((uint32_t)value[1] << 16) |
          ((uint32_t)value[2] << 8) | (uint32_t)value[3];
@@ -2868,6 +2988,8 @@ static PyMethodDef module_methods[] = {
      "Stream a Peppi Arrow replay through a Melee core scalar runtime."},
     {"write_benchmark_case", (PyCFunction)(void*)write_benchmark_case, METH_VARARGS | METH_KEYWORDS,
      "Write an ordinary-input benchmark tape from Peppi Arrow buffers."},
+    {"export_replay", (PyCFunction)(void*)export_replay, METH_VARARGS | METH_KEYWORDS,
+     "Export public replay ABI 1 config, previous input, and recorded frames."},
     {"slpz_unorder_events", slpz_unorder_events, METH_VARARGS,
      "Unshuffle a decompressed .slpz event stream."},
     {NULL, NULL, 0, NULL},

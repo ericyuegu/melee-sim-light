@@ -102,7 +102,7 @@ def capture_issues(game, raw: bytes, *, played_on: str | None = None,
         start.get("item_spawn_frequency") != -1 or
         not math.isfinite(start.get("damage_ratio", float("nan"))) or
         start.get("damage_ratio", 0) <= 0 or start.get("timer") != 480 or
-        start.get("bitfield") not in ([50, 1, 134, 76], [50, 1, 142, 76])):
+        start.get("bitfield") not in ([50, 1, 134, 76], [50, 1, 142, 76], (50, 1, 134, 76), (50, 1, 142, 76))):
         issues.append("unsupported-settings")
     if start.get("stage") == 3 and not stadium_is_frozen(start, codes):
         issues.append("unfrozen-stadium")
