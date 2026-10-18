@@ -2757,7 +2757,7 @@ done:
   return result;
 }
 
-static PyObject* export_replay(PyObject* self, PyObject* args, PyObject* kwargs) {
+static PyObject* msl_export_replay(PyObject* self, PyObject* args, PyObject* kwargs) {
   static char* keywords[] = {
       "frames",
       "start",
@@ -2837,7 +2837,7 @@ static PyObject* export_replay(PyObject* self, PyObject* args, PyObject* kwargs)
     goto done;
   }
   if (rows.count > UINT32_MAX) {
-    PyErr_SetString(PyExc_OverflowError, "benchmark replay exceeds the case format");
+    PyErr_SetString(PyExc_OverflowError, "recorded replay exceeds the frame-count limit");
     goto done;
   }
 
@@ -2988,7 +2988,7 @@ static PyMethodDef module_methods[] = {
      "Stream a Peppi Arrow replay through a Melee core scalar runtime."},
     {"write_benchmark_case", (PyCFunction)(void*)write_benchmark_case, METH_VARARGS | METH_KEYWORDS,
      "Write an ordinary-input benchmark tape from Peppi Arrow buffers."},
-    {"export_replay", (PyCFunction)(void*)export_replay, METH_VARARGS | METH_KEYWORDS,
+    {"export_replay", (PyCFunction)(void*)msl_export_replay, METH_VARARGS | METH_KEYWORDS,
      "Export public replay ABI 1 config, previous input, and recorded frames."},
     {"slpz_unorder_events", slpz_unorder_events, METH_VARARGS,
      "Unshuffle a decompressed .slpz event stream."},

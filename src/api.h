@@ -29,9 +29,9 @@ typedef enum MslResult {
   MSL_INCOMPATIBLE = 4,
 } MslResult;
 
-// Internal fighter kinds, identical to libmelee Character values. These are
-// NOT Slippi's external character-select ids. ICE_CLIMBERS selects Popo and
-// creates Nana as a follower; Nana (kind 11) is not a selectable leader.
+// Use internal fighter kinds, as in libmelee Character. Convert Slippi's
+// character-select ids before calling this API. ICE_CLIMBERS selects Popo
+// and creates Nana as a follower. Select kind 10 for the pair.
 typedef enum MslCharacter {
   MSL_CHARACTER_MARIO = 0,
   MSL_CHARACTER_FOX = 1,
@@ -289,10 +289,8 @@ typedef struct MslReplayCpuInput {
 
 typedef struct MslReplayStageEvents {
     float fod_platform_height[2];
-    // Slippi records the global RNG both at the frame-start scheduler boundary
-    // and again when the first fighter input callback begins. The latter
-    // closes over earlier stage/effect consumers without making them fighter
-    // logic.
+    // Slippi records RNG at frame start and at the first fighter input
+    // callback. Stage and effect callbacks can consume RNG between those points.
     uint32_t fighter_pre_random_seed;
     uint8_t fod_platform_mask;
     uint8_t dreamland_whispy_valid;

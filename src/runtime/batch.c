@@ -233,7 +233,7 @@ static MslCoreResult validate_mask(const MslCoreBatch* batch,
     return MSL_CORE_OK;
 }
 
-static MslCoreResult reset_matches(
+static MslCoreResult msl_core_reset_matches(
     MslCoreBatch* batch, const MslCoreMatchConfig* configs,
     size_t config_stride, const uint8_t* match_mask, size_t mask_stride,
     const MslReplayInput* previous_inputs)
@@ -299,7 +299,7 @@ MslCoreResult msl_core_batch_reset_matches(
     MslCoreBatch* batch, const MslCoreMatchConfig* configs,
     size_t config_stride, const uint8_t* match_mask, size_t mask_stride)
 {
-    return reset_matches(batch, configs, config_stride, match_mask, mask_stride, NULL);
+    return msl_core_reset_matches(batch, configs, config_stride, match_mask, mask_stride, NULL);
 }
 
 MslCoreResult msl_core_batch_reset_replay(
@@ -309,23 +309,23 @@ MslCoreResult msl_core_batch_reset_replay(
     if (previous == NULL) return MSL_CORE_INVALID_ARGUMENT;
     if (batch == NULL || configs == NULL) return MSL_CORE_INVALID_ARGUMENT;
     for (uint32_t i = 0; i < batch->match_count; ++i) {
-        const MslReplayConfig* c = &configs[i];
+        const MslReplayConfig* config = &configs[i];
         if (!selected(mask, 1, i)) continue;
-        if (c->match_damage_ratio <= 0 || c->stock_count == 0 || c->is_teams > 1 ||
-            c->friendly_fire > 1 || c->camera_mode > 1 ||
-            c->online_fnmsubs_zero > 1 || c->brawl_offscreen_damage > 1 ||
-            c->freeze_dead_up_fall_physics > 1 || c->whispy_dead_fighter_fix > 1 ||
-            c->ucf_cardinals_1_0_enabled > 1 || c->ucf_shield_sdi_enabled > 1 ||
-            c->ucf_sdi_enabled > 1 || c->ucf_shield_drop_extended_enabled > 1 ||
-            c->ucf_shield_drop_084_enabled > 1 || c->stage_event_streams > 3)
+        if (config->match_damage_ratio <= 0 || config->stock_count == 0 || config->is_teams > 1 ||
+            config->friendly_fire > 1 || config->camera_mode > 1 ||
+            config->online_fnmsubs_zero > 1 || config->brawl_offscreen_damage > 1 ||
+            config->freeze_dead_up_fall_physics > 1 || config->whispy_dead_fighter_fix > 1 ||
+            config->ucf_cardinals_1_0_enabled > 1 || config->ucf_shield_sdi_enabled > 1 ||
+            config->ucf_sdi_enabled > 1 || config->ucf_shield_drop_extended_enabled > 1 ||
+            config->ucf_shield_drop_084_enabled > 1 || config->stage_event_streams > 3)
             return MSL_CORE_INVALID_ARGUMENT;
-        for (uint32_t p = 0; p < c->num_players && p < MSL_MAX_PLAYERS; ++p) {
-            if (c->players[p].handicap < 1 || c->players[p].cpu_level > 9 ||
+        for (uint32_t p = 0; p < config->num_players && p < MSL_MAX_PLAYERS; ++p) {
+            if (config->players[p].handicap < 1 || config->players[p].cpu_level > 9 ||
                 previous[i].p[p].nml_valid > 3)
                 return MSL_CORE_INVALID_ARGUMENT;
         }
     }
-    return reset_matches(batch, configs, sizeof(*configs), mask, 1, previous);
+    return msl_core_reset_matches(batch, configs, sizeof(*configs), mask, 1, previous);
 }
 
 MslCoreResult msl_core_batch_step_replay(
@@ -336,17 +336,17 @@ MslCoreResult msl_core_batch_step_replay(
         return MSL_CORE_INVALID_ARGUMENT;
     for (i = 0; i < batch->match_count; ++i) {
         if (!selected(mask, 1, i)) continue;
-        const MslReplayStageEvents* e = &frames[i].stage_events;
-        if (e->fod_platform_mask > 3 || e->dreamland_whispy_valid > 1 ||
-            e->fighter_pre_random_seed_valid > 1 ||
-            (e->dreamland_whispy_valid && e->dreamland_whispy_direction > 2))
+        const MslReplayStageEvents* events = &frames[i].stage_events;
+        if (events->fod_platform_mask > 3 || events->dreamland_whispy_valid > 1 ||
+            events->fighter_pre_random_seed_valid > 1 ||
+            (events->dreamland_whispy_valid && events->dreamland_whispy_direction > 2))
             return MSL_CORE_INVALID_ARGUMENT;
         for (uint32_t p = 0; p < MSL_MAX_PLAYERS; ++p) {
-            if (frames[i].input.p[p].nml_valid > 3 || e->cpu_inputs[p].valid > 1)
+            if (frames[i].input.p[p].nml_valid > 3 || events->cpu_inputs[p].valid > 1)
                 return MSL_CORE_INVALID_ARGUMENT;
-            if (p < 2 && (e->fod_platform_mask & (1 << p)) && !isfinite(e->fod_platform_height[p]))
+            if (p < 2 && (events->fod_platform_mask & (1 << p)) && !isfinite(events->fod_platform_height[p]))
                 return MSL_CORE_INVALID_ARGUMENT;
-            const MslReplayCpuInput* cpu = &e->cpu_inputs[p];
+            const MslReplayCpuInput* cpu = &events->cpu_inputs[p];
             if (cpu->valid && (!isfinite(cpu->main_x) || !isfinite(cpu->main_y) ||
                 !isfinite(cpu->c_x) || !isfinite(cpu->c_y) || !isfinite(cpu->trigger)))
                 return MSL_CORE_INVALID_ARGUMENT;
