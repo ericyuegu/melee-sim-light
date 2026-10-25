@@ -26,6 +26,7 @@
 #include <baselib/aobj.h>
 #include <baselib/fobj.h>
 #include <baselib/gobj.h>
+#include <baselib/mtx.h>
 #include <baselib/objalloc.h>
 #include <baselib/robj.h>
 #include "it/item.h"

@@ -210,6 +210,7 @@ SMOKE_SRCS := \
 NATIVE_SMOKE_SRCS := \
 	$(ROOT)/tests/melee_core/mewtwo_moves_smoke.c \
 	$(ROOT)/tests/melee_core/gamewatch_moves_smoke.c \
+	$(ROOT)/tests/melee_core/gamewatch_torch_smoke.c \
 	$(ROOT)/tests/melee_core/roy_moves_smoke.c \
 	$(ROOT)/tests/melee_core/pichu_moves_smoke.c \
 	$(ROOT)/tests/melee_core/kirby_moves_smoke.c \
@@ -756,6 +757,7 @@ $(eval $(call link_native_smoke,$(NATIVE_STAGE_LIFECYCLE_SMOKE),$(NATIVE_OBJ_DIR
 $(eval $(call link_native_smoke,$(NATIVE_ARTICLE_POOL_SMOKE),$(NATIVE_OBJ_DIR)/tests/melee_core/article_pool_smoke.o))
 $(eval $(call link_native_smoke,$(NATIVE_BUILD)/mewtwo-moves-smoke,$(NATIVE_OBJ_DIR)/tests/melee_core/mewtwo_moves_smoke.o))
 $(eval $(call link_native_smoke,$(NATIVE_BUILD)/gamewatch-moves-smoke,$(NATIVE_OBJ_DIR)/tests/melee_core/gamewatch_moves_smoke.o))
+$(eval $(call link_native_smoke,$(NATIVE_BUILD)/gamewatch-torch-smoke,$(NATIVE_OBJ_DIR)/tests/melee_core/gamewatch_torch_smoke.o))
 $(eval $(call link_native_smoke,$(NATIVE_BUILD)/roy-moves-smoke,$(NATIVE_OBJ_DIR)/tests/melee_core/roy_moves_smoke.o))
 $(eval $(call link_native_smoke,$(NATIVE_BUILD)/pichu-moves-smoke,$(NATIVE_OBJ_DIR)/tests/melee_core/pichu_moves_smoke.o))
 $(eval $(call link_native_smoke,$(NATIVE_BUILD)/kirby-moves-smoke,$(NATIVE_OBJ_DIR)/tests/melee_core/kirby_moves_smoke.o))
@@ -800,7 +802,7 @@ native-smoke: fnmsubs-smoke mewtwo-smoke gamewatch-smoke roy-smoke pichu-smoke k
 	@$(TIMEOUT) 5s "$(NATIVE_SCALAR_API_SMOKE)" "$(DATA)" 32 4 16
 	@$(TIMEOUT) 10s "$(NATIVE_BUILD)/cpu-replay-smoke" "$(DATA)"
 	@$(TIMEOUT) 5s "$(NATIVE_CONTEXT_SMOKE)" "$(DATA)"
-	@$(TIMEOUT) 5s "$(NATIVE_BATCH_API_SMOKE)" "$(DATA)"
+	@$(TIMEOUT) 10s "$(NATIVE_BATCH_API_SMOKE)" "$(DATA)"
 	@$(TIMEOUT) 5s "$(NATIVE_PUBLIC_API_SMOKE)" "$(DATA)"
 	@$(TIMEOUT) 5s "$(NATIVE_GAMEPLAY_PARTS_SMOKE)" "$(DATA)"
 	@$(TIMEOUT) 5s "$(NATIVE_STAGE_LIFECYCLE_SMOKE)" "$(DATA)"
@@ -912,8 +914,9 @@ mewtwo-smoke: data-check $(NATIVE_BUILD)/mewtwo-moves-smoke
 	@$(TIMEOUT) 10s "$(NATIVE_BUILD)/mewtwo-moves-smoke" "$(DATA)"
 
 .PHONY: gamewatch-smoke
-gamewatch-smoke: data-check $(NATIVE_BUILD)/gamewatch-moves-smoke
+gamewatch-smoke: data-check $(NATIVE_BUILD)/gamewatch-moves-smoke $(NATIVE_BUILD)/gamewatch-torch-smoke
 	@$(TIMEOUT) 10s "$(NATIVE_BUILD)/gamewatch-moves-smoke" "$(DATA)"
+	@$(TIMEOUT) 120s "$(NATIVE_BUILD)/gamewatch-torch-smoke" "$(DATA)"
 .PHONY: fnmsubs-smoke
 fnmsubs-smoke: $(NATIVE_BUILD)/fnmsubs-smoke
 	@$(TIMEOUT) 10s "$(NATIVE_BUILD)/fnmsubs-smoke"

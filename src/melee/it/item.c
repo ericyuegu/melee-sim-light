@@ -113,12 +113,12 @@ HSD_ObjAllocData item_link_alloc_data;
 
 #ifdef MSL_CORE_NATIVE
 u32 msl_item_reserve_runtime_pools(bool common_items, u32 stage_item_count,
-                                   u32 link_count)
+                                   u32 link_count, u32 retained_items)
 {
-    // Item_802674AC assigns supported fighter articles to category 8 and
-    // Peach's rare pulls to category 0. Item_8026784C enforces these separate
-    // ItCo.dat limits; the public observation's 15 slots are not a spawn cap.
-    u32 item_count = it_804D6D28->x1C + stage_item_count;
+    // Category 8 fighter articles have no source count cap. Preserve the
+    // ordinary burst reserve and add articles retained across repeated moves.
+    // Peach's rare pulls use the independently capped common-item category.
+    u32 item_count = it_804D6D28->x1C + stage_item_count + retained_items;
     if (common_items) {
         item_count += it_804D6D28->x0;
     }

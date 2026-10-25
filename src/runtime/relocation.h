@@ -22,8 +22,8 @@ typedef struct MslRelocTypeDesc {
 extern const MslRelocTypeDesc msl_reloc_type_descs[MSL_RELOC_TYPE_COUNT];
 
 enum {
-    MSL_RELOC_OBJECT_CAPACITY = 16384,
-    MSL_RELOC_INDEX_CAPACITY = 32768,
+    MSL_RELOC_OBJECT_CAPACITY = 524288,
+    MSL_RELOC_INDEX_CAPACITY = 1048576,
     // Source intrusive allocators use the first pointer-sized word as their
     // free-list link even when the allocated type's first field is scalar.
     MSL_RELOC_INTRUSIVE_FIRST_POINTER = 1 << 0,
@@ -47,7 +47,7 @@ typedef struct MslRelocRegistry {
 
 // Runtime relocation ownership retains the records reached during sealed
 // Match construction, a bounded class-piece split reserve, and a compact
-// 16-bit address index. Runtime allocations consume preallocated arena/pool
+// 32-bit address index. Runtime allocations consume preallocated arena/pool
 // storage; the only permitted new record address is a subobject split from
 // that storage. The large registry above is thread-local construction scratch.
 typedef struct MslRelocRecord {

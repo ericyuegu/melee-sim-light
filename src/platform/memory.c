@@ -25,14 +25,12 @@ enum {
     // GameData is initialized once; keep its existing 128 MiB reserve.
     // tests/melee_core/runtime_census.c
     MSL_MEMORY_GAME_DATA_BYTES = 128 * 1024 * 1024,
-    // Native supported-domain construction remains below 2.75 MiB after
-    // bounded source pools and exact relocation metadata. Keep a measured
-    // 3 MiB hard ceiling; runtime allocation is forbidden after sealing.
-    // The PPC compatibility oracle still constructs source-width DAT graphs
-    // inside its Match arena and is not a resident production-batch target.
-    // tests/melee_core/runtime_census.c
+    // Virtual capacity covers four Game & Watch eight-minute torch reserves.
+    // Native mmap commits only the lineup's constructed pools. Other lineups
+    // retain their smaller working sets; gameplay still cannot grow an arena.
+    // tests/melee_core/gamewatch_torch_smoke.c
 #ifdef MSL_CORE_NATIVE
-    MSL_MEMORY_MATCH_BYTES = 3 * 1024 * 1024,
+    MSL_MEMORY_MATCH_BYTES = 64 * 1024 * 1024,
 #else
     // 8 MiB filled up when the twelfth character (Dr. Mario) joined the
     // supported roster, and 12 MiB failed a 2.1 MiB construction allocation

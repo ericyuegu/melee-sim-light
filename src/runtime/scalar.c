@@ -1031,6 +1031,8 @@ static int match_construct(MslCoreMatch* match,
     uint32_t sheik_count = 0;
     uint32_t ics_count = 0;
     uint32_t peach_count = 0;
+    uint32_t gamewatch_count = 0;
+    u32 gamewatch_items;
     u32 runtime_item_count;
 #endif
 
@@ -1264,6 +1266,9 @@ static int match_construct(MslCoreMatch* match,
         if (match->config.players[i].char_id == MSL_CORE_CHAR_POPO) {
             ics_count += 1;
         }
+        if (match->config.players[i].char_id == MSL_CHAR_GAMEWATCH) {
+            gamewatch_count += 1;
+        }
         if (match->config.players[i].char_id == MSL_CORE_CHAR_PEACH) {
             peach_count += 1;
         }
@@ -1402,6 +1407,21 @@ static int match_construct(MslCoreMatch* match,
     // refs/melee/src/sysdolphin/baselib/{aobj.c,fobj.c,id.c,mtx.c,robj.c}
     // tests/melee_core/runtime_census.c
     // refs/melee/src/melee/gr/grstory.c
+    // Retain the source item reserve and the per-tether link
+    // reserves. Shy Guys are a separate stage-owned producer; grStory_801E3418
+    // admits one wave of at most five while no prior wave remains alive.
+    // Consecutive AttackS4 transitions retain prior torches: the item
+    // callback sees AttackS4 again before it can remove them. Category 8
+    // has no Item_8026784C cap. Seven hundred torches per fighter cover
+    // an eight-minute game at the minimum 42-frame repeat interval.
+    // PlGw.dat: 16 joints, 7 animated joints and 40 animation tracks per
+    // torch; Item_8026862C schedules 10 procs and attachment adds 2 RObjs.
+    gamewatch_items = 700 * gamewatch_count;
+    runtime_item_count = msl_item_reserve_runtime_pools(
+        peach_count != 0,
+        match->config.stage_id == MSL_CORE_STAGE_YOSHIS_STORY ? 5u : 0u,
+        151 + 64 * samus_count + 24 * link_count + 32 * sheik_count +
+            48 * ics_count, gamewatch_items);
     // Samus's grapple-catch loads one AObj per animated joint of the beam
     // link chain alongside its FObj tracks, so this reserve is per-fighter
     // too: four-Samus air grapple-catches measured 151 live AObjs (5 / 46 /
@@ -1427,7 +1447,7 @@ static int match_construct(MslCoreMatch* match,
     }
     HSD_ObjAllocEnsureFree(HSD_AObjGetAllocData(),
                            128 + 64 * samus_count + 64 * mewtwo_count +
-                               64 * kirby_count);
+                               64 * kirby_count + 7 * gamewatch_items);
     // Article animation loads a whole joint graph in a single frame, so the
     // FObj bound is the sum of the concurrent per-fighter bursts. Every port
     // can contribute its own, and bursts from different fighters overlap, so
@@ -1461,20 +1481,23 @@ static int match_construct(MslCoreMatch* match,
     HSD_ObjAllocEnsureFree(HSD_FObjGetAllocData(),
                            256 + 128 * ness_count + 256 * samus_count +
                                32 * link_count + 32 * peach_count +
-                               192 * mewtwo_count + 256 * kirby_count);
+                               192 * mewtwo_count + 256 * kirby_count +
+                               40 * gamewatch_items);
     // Costume-hat loaders publish every descriptor key against fighter parts;
     // those IDs remain after a hat is replaced. Bound all preloaded costume
     // and accessory trees per Kirby, in addition to transient hat/item IDs.
     // ftKirby/ftkirby.c::{ftKb_SpecialN_800EF0E4,ftKb_SpecialN_800EF438}
     HSD_ObjAllocEnsureFree(HSD_IDGetAllocData(),
-                           128 + 32 * kirby_count + kirby_hat_ids);
+                           128 + 32 * kirby_count + kirby_hat_ids +
+                               16 * gamewatch_items);
     // Link and Young Link carry four RObjs each against two for every other
     // supported fighter, so four Link ports land on exactly 16 live RObjs and
     // filled the former flat 16-slot reserve to the last slot. Nothing is live
     // at seal, so that reserve was the whole capacity and any additional
     // consumer in the same match would have aborted.
     // refs/melee/src/sysdolphin/baselib/robj.c
-    HSD_ObjAllocEnsureFree(HSD_RObjGetAllocData(), 16 + 8 * link_count);
+    HSD_ObjAllocEnsureFree(HSD_RObjGetAllocData(), 16 + 8 * link_count +
+                               2 * gamewatch_items);
     // Each grapple beam link is its own GObj, so the same per-fighter bound
     // applies: four-Samus air grapple-catches measured 170 live GObjs
     // (21 / 60 / 106 / 170 for zero, one, two, and four Samus) against the
@@ -1482,14 +1505,15 @@ static int match_construct(MslCoreMatch* match,
     HSD_ObjAllocEnsureFree(&gobj_alloc_data,
                            128 + 64 * samus_count + 32 * link_count +
                                32 * sheik_count + 64 * ics_count +
-                               32 * kirby_count);
+                               32 * kirby_count + gamewatch_items);
     // Every live item GObj schedules a proc, and Ness's steered PK Thunder
     // plus PK Fire pillars keep the most item GObjs alive at once: an
     // hour-long four-Ness chaos soak peaked at 365 live procs against the
     // former flat 256, aborting in HSD_GObj_SetupProc. Two Ness beside two
     // Pikachu measured 267, so one Ness already leaves the flat figure thin.
     // tests/melee_core/pool_chaos_soak.c
-    HSD_ObjAllocEnsureFree(&gobjproc_alloc_data, 256 + 64 * ness_count);
+    HSD_ObjAllocEnsureFree(&gobjproc_alloc_data, 256 + 64 * ness_count +
+                               10 * gamewatch_items);
     // The reached Peach article graph consumes twelve temporary matrix-pool
     // slots. The resulting fifteen-item bound rounds to the established
     // 256-slot small-object reserve.
@@ -1499,7 +1523,8 @@ static int match_construct(MslCoreMatch* match,
     // margin explicitly rather than leaving it to luck.
     // tests/melee_core/pool_chaos_soak.c
     HSD_ObjAllocEnsureFree(HSD_MtxGetAllocData(),
-                           256 + 32 * samus_count + 96 * kirby_count);
+                           256 + 32 * samus_count + 96 * kirby_count +
+                               16 * gamewatch_items);
     // Matrix setup lazily allocates at most one scale Vec per fighter joint.
     // Reserve the complete constructed pose, including followers and dormant
     // transformation halves, plus the existing item/effect headroom.
@@ -1507,15 +1532,7 @@ static int match_construct(MslCoreMatch* match,
     // refs/melee/src/sysdolphin/baselib/mtx.c::{HSD_VecAlloc,HSD_VecFree}
     HSD_ObjAllocEnsureFree(HSD_VecGetAllocData(),
                            match->fighter_pose.joint_count + 128 +
-                               96 * kirby_count);
-    // Retain dev's full source item reserve and the incoming per-tether link
-    // reserves. Shy Guys are a separate stage-owned producer; grStory_801E3418
-    // admits one wave of at most five while no prior wave remains alive.
-    runtime_item_count = msl_item_reserve_runtime_pools(
-        peach_count != 0,
-        match->config.stage_id == MSL_CORE_STAGE_YOSHIS_STORY ? 5u : 0u,
-        151 + 64 * samus_count + 24 * link_count + 32 * sheik_count +
-            48 * ics_count);
+                               96 * kirby_count + 16 * gamewatch_items);
     // The compact construction graph no longer leaves renderer JObjs on the
     // class free list. Preserve runtime headroom for the reached source class
     // sizes: supported item/effect graphs can cross the former 64-piece JObj
@@ -1533,7 +1550,10 @@ static int match_construct(MslCoreMatch* match,
     // PlPe.dat turnip graph has 17 joints (it_802BD4AC -> Item_802680CC).
     msl_class_reserve_pieces(
         sizeof(HSD_JObj), 128 + 128 * match->config.num_players +
-                              (peach_count != 0 ? 17 * runtime_item_count : 0));
+                              (peach_count != 0
+                                   ? 17 * (runtime_item_count - gamewatch_items)
+                                   : 0) +
+                              16 * gamewatch_items);
 
     // This Match's source allocation pools are complete. Shared DAT graphs
     // are sealed once, after GameData has preloaded the supported domain;

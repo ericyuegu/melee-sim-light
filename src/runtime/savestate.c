@@ -22,7 +22,7 @@
 #endif
 
 enum {
-    MSL_SAVESTATE_VERSION = 4,
+    MSL_SAVESTATE_VERSION = 5,
 };
 
 typedef struct MslSavestateHeader {
@@ -331,7 +331,7 @@ static int relocate_match(MslCoreMatch* match, const RelocBases* bases)
 
     record_bytes = (size_t) match->relocation_record_capacity *
                    sizeof(MslRelocRecord);
-    index_bytes = (size_t) match->relocation_index_capacity * sizeof(uint16_t);
+    index_bytes = (size_t) match->relocation_index_capacity * sizeof(uint32_t);
     if (match->relocation_count == 0 ||
         match->relocation_record_capacity == 0 ||
         match->relocation_count > match->relocation_record_capacity ||
